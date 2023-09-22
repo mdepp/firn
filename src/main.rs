@@ -2,9 +2,9 @@ mod child;
 
 use iced::event::{Event, Status};
 use iced::futures::channel::mpsc::Sender;
-use iced::subscription;
 use iced::widget::text;
 use iced::{executor, keyboard};
+use iced::{subscription, window};
 use iced::{Application, Command, Element, Settings, Subscription, Theme};
 use log::debug;
 
@@ -48,14 +48,18 @@ impl Application for Firn {
     fn update(&mut self, message: Message) -> Command<Message> {
         debug!("Recv message: {message:?}");
         match message {
+            Message::ChildEvent(child::OutputEvent::Connected(sender)) => {
+                self.child_sender = Some(sender);
+                Command::none()
+            }
+            Message::ChildEvent(child::OutputEvent::Disconnected) => window::close(),
             Message::ChildEvent(child::OutputEvent::Stdout(text)) => {
                 self.text += &text;
+                Command::none()
             }
             Message::ChildEvent(child::OutputEvent::Stderr(text)) => {
                 self.text += &text;
-            }
-            Message::ChildEvent(child::OutputEvent::Connected(sender)) => {
-                self.child_sender = Some(sender);
+                Command::none()
             }
             Message::ApplicationEvent(Event::Keyboard(keyboard::Event::CharacterReceived(ch))) => {
                 if let Some(child_sender) = self.child_sender.as_mut() {
@@ -64,10 +68,10 @@ impl Application for Firn {
                         .try_send(child::InputEvent::Stdin(ch.into()))
                         .unwrap();
                 }
+                Command::none()
             }
-            _ => {}
-        };
-        Command::none()
+            _ => Command::none(),
+        }
     }
 
     fn subscription(&self) -> Subscription<Message> {

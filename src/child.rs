@@ -11,7 +11,10 @@ use std::{
     future::{pending, Future},
     process::Stdio,
 };
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
+use tokio::{
+    io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
+    task,
+};
 
 const READ_BUF_SIZE: usize = 100;
 const CHANNEL_BUF_SIZE: usize = 100;
@@ -55,7 +58,7 @@ pub fn connect() -> Subscription<OutputEvent> {
                 send_output.send(OutputEvent::Stdout(text)).await.unwrap();
             });
 
-            let stdin_future = (|| async move {
+            let stdin_handle = task::spawn(async move {
                 debug!("Waiting for input messages...");
                 loop {
                     match recv_input.next().await {
@@ -66,9 +69,11 @@ pub fn connect() -> Subscription<OutputEvent> {
                         None => break,
                     }
                 }
-            })();
+            });
 
-            join!(stdout_future, stderr_future, stdin_future);
+            join!(stdout_future, stderr_future);
+            stdin_handle.abort();
+            send_output.send(OutputEvent::Disconnected).await.unwrap();
 
             pending::<()>().await;
             unreachable!();
@@ -107,6 +112,7 @@ pub enum InputEvent {
 #[derive(Debug, Clone)]
 pub enum OutputEvent {
     Connected(Sender<InputEvent>),
+    Disconnected,
     Stdout(String),
     Stderr(String),
 }
