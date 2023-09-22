@@ -1,5 +1,9 @@
 mod child;
+mod config;
 
+use std::path::Path;
+
+use config::Config;
 use iced::event::{Event, Status};
 use iced::futures::channel::mpsc::Sender;
 use iced::widget::{scrollable, text};
@@ -13,6 +17,7 @@ struct Firn {
     scrollable_id: scrollable::Id,
     child_sender: Option<Sender<child::InputEvent>>,
     theme: Theme,
+    config: Config,
 }
 
 #[derive(Debug, Clone)]
@@ -25,15 +30,16 @@ impl Application for Firn {
     type Message = Message;
     type Theme = Theme;
     type Executor = executor::Default;
-    type Flags = ();
+    type Flags = Config;
 
-    fn new(_: Self::Flags) -> (Self, Command<Message>) {
+    fn new(config: Config) -> (Self, Command<Message>) {
         (
             Self {
                 text: "".into(),
                 scrollable_id: scrollable::Id::unique(),
                 child_sender: None,
                 theme: Theme::Dark,
+                config,
             },
             Command::none(),
         )
@@ -80,7 +86,7 @@ impl Application for Firn {
 
     fn subscription(&self) -> Subscription<Message> {
         Subscription::batch([
-            child::connect().map(|event| Message::ChildEvent(event)),
+            child::connect(self.config.clone()).map(|event| Message::ChildEvent(event)),
             subscription::events_with(|event, status| match (&event, status) {
                 (Event::Keyboard(_), Status::Ignored) => Some(Message::ApplicationEvent(event)),
                 _ => None,
@@ -95,7 +101,8 @@ impl Application for Firn {
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
+    let config = Config::from_path(Path::new("config.json")).unwrap_or(Config::default());
 
-    Firn::run(Settings::default())?;
+    Firn::run(Settings::with_flags(config))?;
     Ok(())
 }
