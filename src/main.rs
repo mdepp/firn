@@ -2,7 +2,7 @@ mod child;
 
 use iced::event::{Event, Status};
 use iced::futures::channel::mpsc::Sender;
-use iced::widget::{text, scrollable};
+use iced::widget::{scrollable, text};
 use iced::{executor, keyboard};
 use iced::{subscription, window};
 use iced::{Application, Command, Element, Settings, Subscription, Theme};
@@ -10,6 +10,7 @@ use log::debug;
 
 struct Firn {
     text: String,
+    scrollable_id: scrollable::Id,
     child_sender: Option<Sender<child::InputEvent>>,
     theme: Theme,
 }
@@ -30,6 +31,7 @@ impl Application for Firn {
         (
             Self {
                 text: "".into(),
+                scrollable_id: scrollable::Id::unique(),
                 child_sender: None,
                 theme: Theme::Dark,
             },
@@ -42,7 +44,9 @@ impl Application for Firn {
     }
 
     fn view(&self) -> Element<Message> {
-        scrollable(text(self.text.clone())).into()
+        scrollable(text(self.text.clone()))
+            .id(self.scrollable_id.clone())
+            .into()
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
@@ -55,11 +59,11 @@ impl Application for Firn {
             Message::ChildEvent(child::OutputEvent::Disconnected) => window::close(),
             Message::ChildEvent(child::OutputEvent::Stdout(text)) => {
                 self.text += &text;
-                Command::none()
+                scrollable::snap_to(self.scrollable_id.clone(), scrollable::RelativeOffset::END)
             }
             Message::ChildEvent(child::OutputEvent::Stderr(text)) => {
                 self.text += &text;
-                Command::none()
+                scrollable::snap_to(self.scrollable_id.clone(), scrollable::RelativeOffset::END)
             }
             Message::ApplicationEvent(Event::Keyboard(keyboard::Event::CharacterReceived(ch))) => {
                 if let Some(child_sender) = self.child_sender.as_mut() {
