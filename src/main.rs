@@ -2,7 +2,7 @@ mod child;
 
 use iced::event::{Event, Status};
 use iced::futures::channel::mpsc::Sender;
-use iced::widget::text;
+use iced::widget::{text, scrollable};
 use iced::{executor, keyboard};
 use iced::{subscription, window};
 use iced::{Application, Command, Element, Settings, Subscription, Theme};
@@ -42,7 +42,7 @@ impl Application for Firn {
     }
 
     fn view(&self) -> Element<Message> {
-        text(self.text.clone()).into()
+        scrollable(text(self.text.clone())).into()
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
