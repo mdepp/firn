@@ -84,23 +84,21 @@ pub fn connect() -> Subscription<OutputEvent> {
 async fn decode_output<T: AsyncRead, F: Future>(bytestream: T, mut cb: impl FnMut(String) -> F) {
     let mut bytestream = Box::pin(bytestream);
     let mut decoder = SHIFT_JIS.new_decoder_without_bom_handling();
-    let decode_buf_size = decoder.max_utf8_buffer_length(READ_BUF_SIZE).unwrap();
 
     let mut readbuf = [0u8; READ_BUF_SIZE];
-    let decodebuf_full = String::from_utf8(vec![b'\0'; decode_buf_size]).unwrap();
+    let mut decodebuf = vec![0u8; decoder.max_utf8_buffer_length(READ_BUF_SIZE).unwrap()];
 
     let mut last = false;
     while !last {
         let nbytes = bytestream.read(&mut readbuf).await.unwrap();
         last = nbytes == 0;
         debug!("Read {} bytes: {:?}", nbytes, &readbuf[..nbytes]);
-        let mut decodebuf = decodebuf_full.clone();
         let (result, nwritten, nread, replaced) =
-            decoder.decode_to_str(&readbuf[..nbytes], &mut decodebuf, last);
+            decoder.decode_to_utf8(&readbuf[..nbytes], &mut decodebuf, last);
         debug!("Decoded (result={result:?} nwritten={nwritten} nread={nread} replaced={replaced}: {:?}", &decodebuf[..nwritten]);
         // Can't have OutputFull result since decode_buf_size was set sufficiently large
         assert!(result == CoderResult::InputEmpty);
-        cb(String::from(&decodebuf[..nwritten])).await;
+        cb(String::from_utf8(decodebuf[..nwritten].into()).unwrap()).await;
     }
 }
 
