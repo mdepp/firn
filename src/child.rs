@@ -49,8 +49,8 @@ pub fn connect(config: Config) -> Subscription<OutputEvent> {
                 stdout,
                 |text| async {
                     debug!("Read stdout: {text:?}");
-                    let mut set_output = send_output.clone();
-                    set_output.send(OutputEvent::Stdout(text)).await.unwrap();
+                    let mut send_output = send_output.clone();
+                    send_output.send(OutputEvent::Stdout(text)).await.unwrap();
                 },
                 config.clone(),
             );
@@ -59,7 +59,7 @@ pub fn connect(config: Config) -> Subscription<OutputEvent> {
                 |text| async {
                     debug!("Read stderr: {text:?}");
                     let mut send_output = send_output.clone();
-                    send_output.send(OutputEvent::Stdout(text)).await.unwrap();
+                    send_output.send(OutputEvent::Stderr(text)).await.unwrap();
                 },
                 config.clone(),
             );
