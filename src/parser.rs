@@ -10,8 +10,8 @@ pub enum Node {
     C0Control(char),
     C1Control(char),
     ControlSequence {
-        parameter_bytes: String,
-        intermediate_bytes: String,
+        parameter_bytes: Option<String>,
+        intermediate_bytes: Option<String>,
         final_byte: char,
     },
     IndependentControlFunction(char),
@@ -62,6 +62,16 @@ impl<'a, T> FromResidual<IntermediateResultResidual> for TryIntermediateResult<'
         match residual {
             IntermediateResultResidual::NoMatch => Self::NoMatch,
             IntermediateResultResidual::Indeterminate => Self::Indeterminate,
+        }
+    }
+}
+
+impl<'a, T> TryIntermediateResult<'a, T> {
+    fn optional(self, chars: Chars<'a>) -> TryIntermediateResult<'a, Option<T>> {
+        match self {
+            Self::Match(chars, val) => TryIntermediateResult::Match(chars, Some(val)),
+            Self::NoMatch => TryIntermediateResult::Match(chars, None),
+            Self::Indeterminate => TryIntermediateResult::Indeterminate,
         }
     }
 }
@@ -137,34 +147,11 @@ impl Node {
         }
     }
 
-    fn capture_group_optional(
-        mut chars: Chars<'_>,
-        mut func: impl FnMut(char) -> bool,
-    ) -> TryIntermediateResult<'_, String> {
-        let mut result = String::new();
-
-        loop {
-            let prev_chars = chars.clone();
-            match chars.next() {
-                Some(ch) if func(ch) => result.push(ch),
-                Some(_) => return TryIntermediateResult::Match(prev_chars, result),
-                None => return TryIntermediateResult::Indeterminate,
-            }
-        }
-    }
-
     fn capture_group_range(
         chars: Chars<'_>,
         range: RangeInclusive<char>,
     ) -> TryIntermediateResult<String> {
         Self::capture_group(chars, |ch| range.contains(&ch))
-    }
-
-    fn capture_group_range_optional(
-        chars: Chars<'_>,
-        range: RangeInclusive<char>,
-    ) -> TryIntermediateResult<String> {
-        Self::capture_group_optional(chars, |ch| range.contains(&ch))
     }
 
     fn parse_c0_control(chars: Chars) -> TryIntermediateResult<Self> {
@@ -180,9 +167,10 @@ impl Node {
 
     fn parse_control_sequence(chars: Chars) -> TryIntermediateResult<Self> {
         let (chars, _) = Self::skip_delimiter(chars, "\x1B[")?;
-        let (chars, parameter_bytes) = Self::capture_group_range_optional(chars, '\x30'..='\x3F')?;
+        let (chars, parameter_bytes) =
+            Self::capture_group_range(chars.clone(), '\x30'..='\x3F').optional(chars)?;
         let (chars, intermediate_bytes) =
-            Self::capture_group_range_optional(chars, '\x20'..='\x2F')?;
+            Self::capture_group_range(chars.clone(), '\x20'..='\x2F').optional(chars)?;
         let (chars, final_byte) = Self::capture_single_range(chars, '\x40'..='\x7E')?;
         TryIntermediateResult::Match(
             chars,
@@ -254,7 +242,7 @@ impl Node {
     }
 
     fn parse_text(chars: Chars) -> TryIntermediateResult<Self> {
-        let (chars, text) = Self::capture_group_lazy(chars, |ch| !ch.is_control())?;
+        let (chars, text) = Self::capture_group_lazy(chars.clone(), |ch| !ch.is_control())?;
         TryIntermediateResult::Match(chars, Self::Text(text))
     }
 
@@ -315,8 +303,8 @@ mod tests {
             NodeParseResult::Match(
                 _,
                 Node::ControlSequence {
-                    parameter_bytes,
-                    intermediate_bytes,
+                    parameter_bytes: Some(parameter_bytes),
+                    intermediate_bytes: Some(intermediate_bytes),
                     final_byte
                 }
             ) if parameter_bytes == "0;1;2" && intermediate_bytes == "!" && final_byte == 'm'
@@ -332,11 +320,11 @@ mod tests {
             NodeParseResult::Match(
                 _,
                 Node::ControlSequence {
-                    parameter_bytes,
-                    intermediate_bytes,
+                    parameter_bytes: None,
+                    intermediate_bytes: Some(intermediate_bytes),
                     final_byte
                 }
-            ) if parameter_bytes.is_empty() && intermediate_bytes == "!" && final_byte == 'm'
+            ) if intermediate_bytes == "!" && final_byte == 'm'
         )
     }
 
@@ -349,11 +337,11 @@ mod tests {
             NodeParseResult::Match(
                 _,
                 Node::ControlSequence {
-                    parameter_bytes,
-                    intermediate_bytes,
+                    parameter_bytes: Some(parameter_bytes),
+                    intermediate_bytes: None,
                     final_byte
                 }
-            ) if parameter_bytes == "0;1;2" && intermediate_bytes.is_empty() && final_byte == 'm'
+            ) if parameter_bytes == "0;1;2" && final_byte == 'm'
         )
     }
 
