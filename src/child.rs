@@ -66,14 +66,9 @@ pub fn connect(config: Config) -> Subscription<OutputEvent> {
 
             let stdin_handle = task::spawn(async move {
                 debug!("Waiting for input messages...");
-                loop {
-                    match recv_input.next().await {
-                        Some(InputEvent::Stdin(text)) => {
-                            debug!("Write stdin: {text:?}");
-                            stdin.write(text.as_bytes()).await.unwrap();
-                        }
-                        None => break,
-                    }
+                while let Some(InputEvent::Stdin(text)) = recv_input.next().await {
+                    debug!("Write stdin: {text:?}");
+                    stdin.write_all(text.as_bytes()).await.unwrap();
                 }
             });
 

@@ -92,7 +92,7 @@ impl Application for Firn {
 
     fn subscription(&self) -> Subscription<Message> {
         Subscription::batch([
-            child::connect(self.config.clone()).map(|event| Message::ChildEvent(event)),
+            child::connect(self.config.clone()).map(Message::ChildEvent),
             subscription::events_with(|event, status| match (&event, status) {
                 (Event::Keyboard(_), Status::Ignored) => Some(Message::ApplicationEvent(event)),
                 _ => None,
@@ -132,7 +132,7 @@ impl Firn {
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
-    let config = Config::from_path(Path::new("config.json")).unwrap_or(Config::default());
+    let config = Config::from_path(Path::new("config.json")).unwrap_or_default();
 
     Firn::run(Settings::with_flags(config))?;
     Ok(())

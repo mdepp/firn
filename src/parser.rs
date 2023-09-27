@@ -80,10 +80,10 @@ impl Node {
         }
     }
 
-    fn capture_single<'a>(
-        mut chars: Chars<'a>,
+    fn capture_single(
+        mut chars: Chars<'_>,
         func: impl FnOnce(char) -> bool,
-    ) -> TryIntermediateResult<'a, char> {
+    ) -> TryIntermediateResult<'_, char> {
         match chars.next() {
             Some(ch) if func(ch) => TryIntermediateResult::Match(chars, ch),
             Some(_) => TryIntermediateResult::NoMatch,
@@ -91,17 +91,17 @@ impl Node {
         }
     }
 
-    fn capture_single_range<'a>(
-        chars: Chars<'a>,
+    fn capture_single_range(
+        chars: Chars<'_>,
         range: RangeInclusive<char>,
-    ) -> TryIntermediateResult<'a, char> {
+    ) -> TryIntermediateResult<'_, char> {
         Self::capture_single(chars, |ch| range.contains(&ch))
     }
 
-    fn capture_group<'a>(
-        chars: Chars<'a>,
+    fn capture_group(
+        chars: Chars<'_>,
         mut func: impl FnMut(char) -> bool,
-    ) -> TryIntermediateResult<'a, String> {
+    ) -> TryIntermediateResult<'_, String> {
         let mut result = String::new();
         let (mut chars, ch) = Self::capture_single(chars, &mut func)?;
         result.push(ch);
@@ -116,10 +116,10 @@ impl Node {
         }
     }
 
-    fn capture_group_lazy<'a>(
-        mut chars: Chars<'a>,
+    fn capture_group_lazy(
+        mut chars: Chars<'_>,
         mut func: impl FnMut(char) -> bool,
-    ) -> TryIntermediateResult<'a, String> {
+    ) -> TryIntermediateResult<'_, String> {
         let mut result = String::new();
         match chars.next() {
             Some(ch) if func(ch) => result.push(ch),
@@ -137,10 +137,10 @@ impl Node {
         }
     }
 
-    fn capture_group_optional<'a>(
-        mut chars: Chars<'a>,
+    fn capture_group_optional(
+        mut chars: Chars<'_>,
         mut func: impl FnMut(char) -> bool,
-    ) -> TryIntermediateResult<'a, String> {
+    ) -> TryIntermediateResult<'_, String> {
         let mut result = String::new();
 
         loop {
@@ -153,15 +153,15 @@ impl Node {
         }
     }
 
-    fn capture_group_range<'a>(
-        chars: Chars<'a>,
+    fn capture_group_range(
+        chars: Chars<'_>,
         range: RangeInclusive<char>,
     ) -> TryIntermediateResult<String> {
         Self::capture_group(chars, |ch| range.contains(&ch))
     }
 
-    fn capture_group_range_optional<'a>(
-        chars: Chars<'a>,
+    fn capture_group_range_optional(
+        chars: Chars<'_>,
         range: RangeInclusive<char>,
     ) -> TryIntermediateResult<String> {
         Self::capture_group_optional(chars, |ch| range.contains(&ch))
@@ -241,10 +241,8 @@ impl Node {
         const SOS: char = '\x58';
 
         let (chars, _) = Self::skip_delimiter(chars, "\x1B")?;
-        let (chars, opening) = Self::capture_single(chars, |ch| match ch {
-            APC | DCS | OSC | PM | SOS => true,
-            _ => false,
-        })?;
+        let (chars, opening) =
+            Self::capture_single(chars, |ch| matches!(ch, APC | DCS | OSC | PM | SOS))?;
         let (chars, character_string) = Self::capture_character_string(chars)?;
         TryIntermediateResult::Match(
             chars,
@@ -338,7 +336,7 @@ mod tests {
                     intermediate_bytes,
                     final_byte
                 }
-            ) if parameter_bytes == "" && intermediate_bytes == "!" && final_byte == 'm'
+            ) if parameter_bytes.is_empty() && intermediate_bytes == "!" && final_byte == 'm'
         )
     }
 
@@ -355,7 +353,7 @@ mod tests {
                     intermediate_bytes,
                     final_byte
                 }
-            ) if parameter_bytes == "0;1;2" && intermediate_bytes == "" && final_byte == 'm'
+            ) if parameter_bytes == "0;1;2" && intermediate_bytes.is_empty() && final_byte == 'm'
         )
     }
 
