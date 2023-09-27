@@ -1,7 +1,9 @@
+#![feature(assert_matches)]
+#![feature(try_trait_v2)]
+
 mod child;
 mod config;
-
-use std::path::Path;
+mod parser;
 
 use config::Config;
 use iced::event::{Event, Status};
@@ -10,10 +12,13 @@ use iced::widget::{scrollable, text};
 use iced::{executor, keyboard};
 use iced::{subscription, window};
 use iced::{Application, Command, Element, Settings, Subscription, Theme};
-use log::debug;
+use log::{debug, info};
+use parser::{Node, NodeParseResult};
+use std::path::Path;
 
 struct Firn {
     text: String,
+    text_buffer: String,
     scrollable_id: scrollable::Id,
     child_sender: Option<Sender<child::InputEvent>>,
     theme: Theme,
@@ -35,7 +40,8 @@ impl Application for Firn {
     fn new(config: Config) -> (Self, Command<Message>) {
         (
             Self {
-                text: "".into(),
+                text: String::new(),
+                text_buffer: String::new(),
                 scrollable_id: scrollable::Id::unique(),
                 child_sender: None,
                 theme: Theme::Dark,
@@ -64,11 +70,11 @@ impl Application for Firn {
             }
             Message::ChildEvent(child::OutputEvent::Disconnected) => window::close(),
             Message::ChildEvent(child::OutputEvent::Stdout(text)) => {
-                self.text += &text;
+                self.add_text(&text);
                 scrollable::snap_to(self.scrollable_id.clone(), scrollable::RelativeOffset::END)
             }
             Message::ChildEvent(child::OutputEvent::Stderr(text)) => {
-                self.text += &text;
+                self.add_text(&text);
                 scrollable::snap_to(self.scrollable_id.clone(), scrollable::RelativeOffset::END)
             }
             Message::ApplicationEvent(Event::Keyboard(keyboard::Event::CharacterReceived(ch))) => {
@@ -96,6 +102,31 @@ impl Application for Firn {
 
     fn theme(&self) -> Theme {
         self.theme.clone()
+    }
+}
+
+impl Firn {
+    fn add_text(&mut self, text: &str) {
+        self.text_buffer += text;
+        let mut chars = self.text_buffer.chars();
+        loop {
+            let node = match Node::parse(chars.clone()) {
+                NodeParseResult::Match(remaining_chars, node) => {
+                    chars = remaining_chars;
+                    Some(node)
+                }
+                NodeParseResult::Indeterminate => None,
+            };
+            match node {
+                Some(Node::Text(text)) => self.text.push_str(&text),
+                Some(Node::C0Control(ch @ ('\x09'..='\x0D' | '\x1C'..='\x1F'))) => {
+                    self.text.push(ch)
+                }
+                Some(node) => info!("Ignoring node {node:?}"),
+                None => break,
+            }
+        }
+        self.text_buffer = chars.collect();
     }
 }
 
