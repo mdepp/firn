@@ -374,4 +374,40 @@ mod tests {
             NodeParseResult::Match(_, Node::ControlString{opening: ']', character_string}) if character_string == "0;Hello"
         );
     }
+
+    #[test]
+    fn test_text_with_combining_marks() {
+        // See https://unicode.org/faq/char_combmark.html
+        let text = String::from_iter([
+            char::from_u32(61).unwrap(),
+            char::from_u32(328).unwrap(),
+            char::from_u32(301).unwrap(),
+        ]);
+        let result = Node::parse(text.chars());
+        assert_matches!(
+            result,
+            NodeParseResult::Match(_, Node::Text(actual_text)) if actual_text == text,
+        );
+    }
+
+    /**
+     * Because text is presented to the parser incrementally, it is important that the parser preservese
+     * partial diacritics and combining sequences, so that they can be combined again later
+     */
+    #[test]
+    fn test_partial_text_with_combining_marks() {
+        let text = String::from_iter([char::from_u32(61).unwrap(), char::from_u32(328).unwrap()]);
+        let result = Node::parse(text.chars());
+        assert_matches!(
+            result,
+            NodeParseResult::Match(_, Node::Text(actual_text)) if actual_text == text,
+        );
+
+        let text = String::from_iter([char::from_u32(301).unwrap()]);
+        let result = Node::parse(text.chars());
+        assert_matches!(
+            result,
+            NodeParseResult::Match(_, Node::Text(actual_text)) if actual_text == text,
+        );
+    }
 }
