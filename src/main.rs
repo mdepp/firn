@@ -1,5 +1,6 @@
 #![feature(assert_matches)]
 #![feature(try_trait_v2)]
+#![feature(async_closure)]
 
 mod child;
 mod config;
@@ -95,7 +96,7 @@ impl Application for Firn {
 
     fn subscription(&self) -> Subscription<Message> {
         Subscription::batch([
-            child::connect(self.config.clone()).map(Message::ChildEvent),
+            child::subscribe_to_pty(self.config.clone()).map(Message::ChildEvent),
             subscription::events_with(|event, status| match (&event, status) {
                 (Event::Keyboard(_), Status::Ignored) => Some(Message::ApplicationEvent(event)),
                 _ => None,
