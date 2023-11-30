@@ -14,7 +14,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             shell: "/usr/bin/bash".into(),
-            shell_args: vec!["-i".into()],
+            shell_args: vec![],
             read_buf_size: 1024,
             channel_buf_size: 100,
         }
