@@ -1,5 +1,3 @@
-use std::cmp::max;
-
 /**
  * A safe way to interact with a ragged array of cells, indexed
  * by an 'active position' (cursor)
@@ -62,7 +60,11 @@ impl DataComponent {
 
     /** Move the active cell to the left, unless already at the left-most cell on a line */
     pub fn activate_prev_cell(&mut self) {
-        self.active_position.col = max(self.active_position.col - 1, 0);
+        self.active_position.col = if self.active_position.col > 0 {
+            self.active_position.col - 1
+        } else {
+            0
+        };
     }
 
     /* Move the active cell to the beginning of the next line, making a new line if necessary */
@@ -80,7 +82,11 @@ impl DataComponent {
     /* Move the active cell to the beginning of the previous line, or to the beginning of the current line if already at the first line */
     pub fn activate_prev_line(&mut self) {
         self.active_position.col = 0;
-        self.active_position.row = max(self.active_position.row - 1, 0);
+        self.active_position.row = if self.active_position.row > 0 {
+            self.active_position.row - 1
+        } else {
+            0
+        };
     }
 
     pub fn activate_first_cell(&mut self) {
