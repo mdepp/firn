@@ -1,3 +1,8 @@
+use log::info;
+use unicode_segmentation::UnicodeSegmentation;
+
+use crate::parser::Node;
+
 /**
  * A safe way to interact with a ragged array of cells, indexed
  * by an 'active position' (cursor)
@@ -16,9 +21,10 @@ pub struct Cell {
 }
 
 /** Unlike the standard, is 0-indexed */
-struct Position {
-    row: usize,
-    col: usize,
+#[derive(Clone, PartialEq, Debug)]
+pub struct Position {
+    pub row: usize,
+    pub col: usize,
 }
 
 impl DataComponent {
@@ -29,6 +35,10 @@ impl DataComponent {
             }],
             active_position: Position { row: 0, col: 0 },
         }
+    }
+
+    pub fn get_active_position(&self) -> Position {
+        self.active_position.clone()
     }
 
     fn get_active_line(&self) -> &Line {
@@ -106,6 +116,37 @@ impl DataComponent {
             }
             result.push('\n');
         }
+        result.pop();
         result
+    }
+
+    pub fn write_node(&mut self, node: &Node) {
+        match node {
+            Node::Text(text) => self.write_text(text),
+            Node::C0Control('\x08') => self.activate_prev_cell(),
+            Node::C0Control('\x0A') => self.activate_next_line(),
+            Node::C0Control('\x0D') => self.activate_first_cell(),
+            Node::C1Control('\x45') => self.activate_first_cell(),
+            Node::C1Control('\x4D') => self.activate_prev_line(),
+            node => info!("Ignoring node {node:?}"),
+        };
+    }
+
+    fn write_text(&mut self, text: &str) {
+        let combined_text = self
+            .get_active_cell()
+            .grapheme
+            .to_owned()
+            .unwrap_or_default()
+            + text;
+        let mut graphemes = combined_text.graphemes(true);
+
+        if let Some(grapheme) = graphemes.next() {
+            self.get_active_cell_mut().grapheme = Some(grapheme.to_string());
+        }
+        for grapheme in graphemes {
+            self.activate_next_cell();
+            self.get_active_cell_mut().grapheme = Some(grapheme.to_string());
+        }
     }
 }

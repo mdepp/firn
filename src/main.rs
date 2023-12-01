@@ -6,6 +6,7 @@ mod child;
 mod config;
 mod data;
 mod parser;
+mod translator;
 
 use config::Config;
 use data::DataComponent;
@@ -15,14 +16,13 @@ use iced::widget::{scrollable, text};
 use iced::{executor, keyboard, Length};
 use iced::{subscription, window};
 use iced::{Application, Command, Element, Settings, Subscription, Theme};
-use log::{debug, info};
-use parser::{Node, NodeParseResult};
+use log::debug;
+use translator::Translator;
 use std::path::Path;
-use unicode_segmentation::UnicodeSegmentation;
 
 struct Firn {
     data: DataComponent,
-    text_buffer: String,
+    translator: Translator,
     scrollable_id: scrollable::Id,
     child_sender: Option<Sender<child::InputEvent>>,
     theme: Theme,
@@ -45,7 +45,7 @@ impl Application for Firn {
         (
             Self {
                 data: DataComponent::new(),
-                text_buffer: String::new(),
+                translator: Translator::new(),
                 scrollable_id: scrollable::Id::unique(),
                 child_sender: None,
                 theme: Theme::Dark,
@@ -74,11 +74,11 @@ impl Application for Firn {
             }
             Message::ChildEvent(child::OutputEvent::Disconnected) => window::close(),
             Message::ChildEvent(child::OutputEvent::Stdout(text)) => {
-                self.add_text(&text);
+                self.translator.write(&text, &mut self.data);
                 scrollable::snap_to(self.scrollable_id.clone(), scrollable::RelativeOffset::END)
             }
             Message::ChildEvent(child::OutputEvent::Stderr(text)) => {
-                self.add_text(&text);
+                self.translator.write(&text, &mut self.data);
                 scrollable::snap_to(self.scrollable_id.clone(), scrollable::RelativeOffset::END)
             }
             Message::ApplicationEvent(Event::Keyboard(keyboard::Event::CharacterReceived(ch))) => {
@@ -109,47 +109,6 @@ impl Application for Firn {
     }
 }
 
-impl Firn {
-    fn add_text(&mut self, text: &str) {
-        self.text_buffer += text;
-        let mut chars = self.text_buffer.chars();
-        while let NodeParseResult::Match(remaining_chars, node) = Node::parse(chars.clone()) {
-            chars = remaining_chars;
-            write_node(&mut self.data, &node);
-        }
-        self.text_buffer = chars.collect();
-    }
-}
-
-fn write_node(data: &mut DataComponent, node: &Node) {
-    match node {
-        Node::Text(text) => write_text(data, text),
-        Node::C0Control('\x08') => data.activate_prev_cell(),
-        Node::C0Control('\x0A') => data.activate_next_line(),
-        Node::C0Control('\x0D') => data.activate_first_cell(),
-        Node::C1Control('\x45') => data.activate_first_cell(),
-        Node::C1Control('\x4D') => data.activate_prev_line(),
-        node => info!("Ignoring node {node:?}"),
-    };
-}
-
-fn write_text(data: &mut DataComponent, text: &str) {
-    let combined_text = data
-        .get_active_cell()
-        .grapheme
-        .to_owned()
-        .unwrap_or_default()
-        + text;
-    let mut graphemes = combined_text.graphemes(true);
-
-    if let Some(grapheme) = graphemes.next() {
-        data.get_active_cell_mut().grapheme = Some(grapheme.to_string());
-    }
-    for grapheme in graphemes {
-        data.activate_next_cell();
-        data.get_active_cell_mut().grapheme = Some(grapheme.to_string());
-    }
-}
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
