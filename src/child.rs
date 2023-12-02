@@ -1,7 +1,6 @@
 use crate::config::Config;
 use anyhow::Context;
-use anyhow::{anyhow, Result};
-use encoding_rs::{CoderResult, SHIFT_JIS};
+use anyhow::Result;
 use iced::futures::channel::mpsc::{Receiver, Sender};
 use iced::futures::{SinkExt, StreamExt};
 use iced::{futures::channel::mpsc, subscription, Subscription};
@@ -58,8 +57,8 @@ async fn make_pty(
                 _ = cloned_token.cancelled() => break,
                 message = receiver.next() => match message {
                     Some(InputEvent::Stdin(text)) => {
-                        debug!("Receive {text} from stdin");
-                        pty_writer.write_all(text.as_bytes()).await?;
+                        debug!("Receive {text:?} from stdin");
+                        pty_writer.write_all(&text).await?;
                         debug!("Sent to pty");
                     }
                     None => break
@@ -74,31 +73,19 @@ async fn make_pty(
     let mut cloned_sender = sender.clone();
     let cloned_token = cancellation_token.clone();
     let read_from_pty = async move || -> Result<()> {
-        let mut decoder = SHIFT_JIS.new_decoder_without_bom_handling();
         let mut readbuf = vec![0u8; config.read_buf_size];
-        let mut decodebuf = vec![
-            0u8;
-            decoder
-                .max_utf8_buffer_length(config.read_buf_size)
-                .ok_or(anyhow!("Could not find decodebuf length"))?
-        ];
 
-        let mut last = false;
-        while !last {
+        loop {
             select! {
                 _ = cloned_token.cancelled() => break,
                     nbytes = pty_reader.read(&mut readbuf) => match nbytes {
+                        Ok(0) => {
+                            debug!("pty finished sending bytes");
+                            break;
+                        }
                         Ok(nbytes) => {
                             debug!("Read {nbytes} bytes from pty");
-                            last = nbytes == 0;
-                            let (result, nwritten, _, _) =
-                                decoder.decode_to_utf8(&readbuf[..nbytes], &mut decodebuf, last);
-                            assert!(
-                                result == CoderResult::InputEmpty,
-                                "Can't have OutputFull result since decode_buf_size was set sufficiently large"
-                            );
-                            let text = String::from_utf8(decodebuf[..nwritten].into())?;
-                            cloned_sender.send(OutputEvent::Stdout(text)).await?;
+                            cloned_sender.send(OutputEvent::Stdout(readbuf[..nbytes].into())).await?;
                         }
                         Err(err) => {
                             error!("pty read error: {err}");
@@ -129,13 +116,12 @@ async fn make_pty(
 
 #[derive(Debug, Clone)]
 pub enum InputEvent {
-    Stdin(String),
+    Stdin(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
 pub enum OutputEvent {
     Connected(Sender<InputEvent>),
     Disconnected,
-    Stdout(String),
-    Stderr(String),
+    Stdout(Vec<u8>),
 }

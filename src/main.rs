@@ -17,8 +17,8 @@ use iced::{executor, keyboard, Length};
 use iced::{subscription, window};
 use iced::{Application, Command, Element, Settings, Subscription, Theme};
 use log::debug;
-use translator::Translator;
 use std::path::Path;
+use translator::Translator;
 
 struct Firn {
     data: DataComponent,
@@ -45,7 +45,7 @@ impl Application for Firn {
         (
             Self {
                 data: DataComponent::new(),
-                translator: Translator::new(),
+                translator: Translator::new().unwrap(),
                 scrollable_id: scrollable::Id::unique(),
                 child_sender: None,
                 theme: Theme::Dark,
@@ -77,15 +77,11 @@ impl Application for Firn {
                 self.translator.write(&text, &mut self.data);
                 scrollable::snap_to(self.scrollable_id.clone(), scrollable::RelativeOffset::END)
             }
-            Message::ChildEvent(child::OutputEvent::Stderr(text)) => {
-                self.translator.write(&text, &mut self.data);
-                scrollable::snap_to(self.scrollable_id.clone(), scrollable::RelativeOffset::END)
-            }
             Message::ApplicationEvent(Event::Keyboard(keyboard::Event::CharacterReceived(ch))) => {
                 if let Some(child_sender) = self.child_sender.as_mut() {
                     debug!("Send character to shell: {ch}");
                     child_sender
-                        .try_send(child::InputEvent::Stdin(ch.into()))
+                        .try_send(child::InputEvent::Stdin(String::from(ch).as_bytes().into()))
                         .unwrap();
                 }
                 Command::none()
@@ -108,7 +104,6 @@ impl Application for Firn {
         self.theme.clone()
     }
 }
-
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();

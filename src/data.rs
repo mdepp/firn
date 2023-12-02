@@ -114,7 +114,7 @@ impl DataComponent {
                     result += " ";
                 }
             }
-            result.push('\n');
+            result = result.trim_end().to_string() + "\n";
         }
         result.pop();
         result
