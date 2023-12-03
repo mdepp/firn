@@ -7,6 +7,7 @@ use iced::{futures::channel::mpsc, subscription, Subscription};
 use log::{debug, error, info};
 use std::future::pending;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::time;
 use tokio::{join, select};
 use tokio_util::sync::CancellationToken;
 
@@ -86,6 +87,8 @@ async fn make_pty(
                         Ok(nbytes) => {
                             debug!("Read {nbytes} bytes from pty");
                             cloned_sender.send(OutputEvent::Stdout(readbuf[..nbytes].into())).await?;
+                            // HACK: throttle pty output messages to avoid overwhelming iced
+                            time::sleep(time::Duration::from_millis(10)).await;
                         }
                         Err(err) => {
                             error!("pty read error: {err}");
