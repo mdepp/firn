@@ -13,7 +13,7 @@ use data::DataComponent;
 use iced::event::{Event, Status};
 use iced::futures::channel::mpsc::Sender;
 use iced::widget::{scrollable, text};
-use iced::{executor, keyboard, Length};
+use iced::{executor, keyboard, Font, Length};
 use iced::{subscription, window};
 use iced::{Application, Command, Element, Settings, Subscription, Theme};
 use log::debug;
@@ -60,7 +60,8 @@ impl Application for Firn {
     }
 
     fn view(&self) -> Element<Message> {
-        scrollable(text(self.data.render()).width(Length::Fill))
+        scrollable(text(self.data.render()).font(Font::MONOSPACE))
+            .width(Length::Fill)
             .id(self.scrollable_id.clone())
             .into()
     }
