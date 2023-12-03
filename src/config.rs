@@ -8,6 +8,7 @@ pub struct Config {
     pub shell_args: Vec<String>,
     pub read_buf_size: usize,
     pub channel_buf_size: usize,
+    pub render_lines: usize,
 }
 
 impl Default for Config {
@@ -17,6 +18,7 @@ impl Default for Config {
             shell_args: vec![],
             read_buf_size: 1024,
             channel_buf_size: 100,
+            render_lines: 100,
         }
     }
 }

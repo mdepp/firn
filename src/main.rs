@@ -60,7 +60,7 @@ impl Application for Firn {
     }
 
     fn view(&self) -> Element<Message> {
-        scrollable(text(self.data.render()).font(Font::MONOSPACE))
+        scrollable(text(self.data.render(self.config.render_lines)).font(Font::MONOSPACE))
             .width(Length::Fill)
             .id(self.scrollable_id.clone())
             .into()

@@ -104,9 +104,14 @@ impl DataComponent {
     }
 
     // XXX replace with real formatting
-    pub fn render(&self) -> String {
+    pub fn render(&self, max_lines: usize) -> String {
         let mut result = String::new();
-        for line in self.lines.iter() {
+        result.clear();
+        for line in self
+            .lines
+            .iter()
+            .skip(self.lines.len().saturating_sub(max_lines))
+        {
             for cell in line.cells.iter() {
                 if let Some(grapheme) = cell.grapheme.as_ref() {
                     result += grapheme;

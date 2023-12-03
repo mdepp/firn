@@ -91,7 +91,7 @@ mod tests {
         let mut data = DataComponent::new();
         let mut translator = Translator::new().unwrap();
         translator.write(b"hello world", &mut data);
-        assert_eq!(data.render(), "hello world");
+        assert_eq!(data.render(10), "hello world");
         assert_eq!(data.get_active_position(), Position { row: 0, col: 10 });
     }
 
@@ -105,7 +105,7 @@ mod tests {
         assert_matches!(String::from_utf8(bytes.into()), Err(_));
 
         translator.write(b"\xd0", &mut data);
-        assert_eq!(data.render(), "");
+        assert_eq!(data.render(10), "");
         assert_eq!(data.get_active_position(), Position { row: 0, col: 0 });
     }
 
@@ -124,7 +124,7 @@ mod tests {
 
         translator.write(first_byte, &mut data);
         translator.write(second_byte, &mut data);
-        assert_eq!(data.render(), "У");
+        assert_eq!(data.render(10), "У");
         assert_eq!(data.get_active_position(), Position { row: 0, col: 0 });
     }
 }
