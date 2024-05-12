@@ -8,12 +8,13 @@ mod data;
 mod parser;
 mod translator;
 
+use anyhow::Result;
 use config::Config;
 use data::DataComponent;
 use iced::event::{Event, Status};
 use iced::futures::channel::mpsc::Sender;
 use iced::widget::{scrollable, text};
-use iced::{executor, keyboard, Font, Length};
+use iced::{executor, keyboard, Font, Length, Pixels};
 use iced::{subscription, window};
 use iced::{Application, Command, Element, Settings, Subscription, Theme};
 use log::debug;
@@ -60,10 +61,14 @@ impl Application for Firn {
     }
 
     fn view(&self) -> Element<Message> {
-        scrollable(text(self.data.render(self.config.render_lines)).font(Font::MONOSPACE))
-            .width(Length::Fill)
-            .id(self.scrollable_id.clone())
-            .into()
+        scrollable(
+            text(self.data.render(self.config.render_lines))
+                .font(Font::MONOSPACE)
+                .size(Pixels::from(16)),
+        )
+        .width(Length::Fill)
+        .id(self.scrollable_id.clone())
+        .into()
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
@@ -79,12 +84,21 @@ impl Application for Firn {
                 scrollable::snap_to(self.scrollable_id.clone(), scrollable::RelativeOffset::END)
             }
             Message::ApplicationEvent(Event::Keyboard(keyboard::Event::CharacterReceived(ch))) => {
-                if let Some(child_sender) = self.child_sender.as_mut() {
-                    debug!("Send character to shell: {ch}");
-                    child_sender
-                        .try_send(child::InputEvent::Stdin(String::from(ch).as_bytes().into()))
-                        .unwrap();
-                }
+                self.send_to_child(child::InputEvent::Stdin(String::from(ch).as_bytes().into()))
+                    .unwrap();
+                Command::none()
+            }
+            Message::ApplicationEvent(Event::Window(window::Event::Resized { width, height })) => {
+                // XXX 10x20 is approximate at best
+                self.send_to_child(child::InputEvent::Resize(
+                    pty_process::Size::new_with_pixel(
+                        (height / 20) as u16,
+                        (width / 10) as u16,
+                        0,
+                        0,
+                    ),
+                ))
+                .unwrap();
                 Command::none()
             }
             _ => Command::none(),
@@ -95,7 +109,9 @@ impl Application for Firn {
         Subscription::batch([
             child::subscribe_to_pty(self.config.clone()).map(Message::ChildEvent),
             subscription::events_with(|event, status| match (&event, status) {
-                (Event::Keyboard(_), Status::Ignored) => Some(Message::ApplicationEvent(event)),
+                (Event::Keyboard(_) | Event::Window(_), Status::Ignored) => {
+                    Some(Message::ApplicationEvent(event))
+                }
                 _ => None,
             }),
         ])
@@ -103,6 +119,15 @@ impl Application for Firn {
 
     fn theme(&self) -> Theme {
         self.theme.clone()
+    }
+}
+
+impl Firn {
+    fn send_to_child(&mut self, message: child::InputEvent) -> Result<()> {
+        if let Some(child_sender) = self.child_sender.as_mut() {
+            child_sender.try_send(message)?;
+        }
+        Ok(())
     }
 }
 

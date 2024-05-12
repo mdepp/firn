@@ -5,6 +5,7 @@ use iced::futures::channel::mpsc::{Receiver, Sender};
 use iced::futures::{SinkExt, StreamExt};
 use iced::{futures::channel::mpsc, subscription, Subscription};
 use log::{debug, error, info};
+use pty_process::Size;
 use std::future::pending;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::time;
@@ -61,6 +62,10 @@ async fn make_pty(
                         debug!("Receive {text:?} from stdin");
                         pty_writer.write_all(&text).await?;
                         debug!("Sent to pty");
+                    }
+                    Some(InputEvent::Resize(size)) => {
+                        debug!("Receive resize -> {size:?}");
+                        pty_writer.resize(size)?;
                     }
                     None => break
                 }
@@ -120,6 +125,7 @@ async fn make_pty(
 #[derive(Debug, Clone)]
 pub enum InputEvent {
     Stdin(Vec<u8>),
+    Resize(Size),
 }
 
 #[derive(Debug, Clone)]
