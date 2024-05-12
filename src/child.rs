@@ -17,7 +17,7 @@ pub fn subscribe_to_pty(config: Config) -> Subscription<OutputEvent> {
     subscription::channel(
         std::any::TypeId::of::<Connect>(),
         config.channel_buf_size,
-        async move |mut send_output| {
+        async move |mut send_output: Sender<OutputEvent>| {
             let config = config.clone();
             let (send_input, recv_input) = mpsc::channel(config.channel_buf_size);
             send_output
@@ -52,7 +52,7 @@ async fn make_pty(
     let cancellation_token = CancellationToken::new();
 
     let cloned_token = cancellation_token.clone();
-    let write_to_pty = async move || -> Result<()> {
+    let mut write_to_pty = async move || -> Result<()> {
         loop {
             select! {
                 _ = cloned_token.cancelled() => break,
@@ -73,7 +73,7 @@ async fn make_pty(
 
     let mut cloned_sender = sender.clone();
     let cloned_token = cancellation_token.clone();
-    let read_from_pty = async move || -> Result<()> {
+    let mut read_from_pty = async move || -> Result<()> {
         let mut readbuf = vec![0u8; config.read_buf_size];
 
         loop {
@@ -101,7 +101,7 @@ async fn make_pty(
         Ok(())
     };
 
-    let cleanup = async move || -> Result<()> {
+    let mut cleanup = async move || -> Result<()> {
         let status = cmd.wait().await?;
         info!("Shell finished with status {status}");
         cancellation_token.cancel();
