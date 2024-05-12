@@ -1,3 +1,4 @@
+use log::error;
 use log::info;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -103,6 +104,26 @@ impl DataComponent {
         self.active_position.col = 0;
     }
 
+    pub fn erase_in_line(&mut self, n: &Option<String>) {
+        match n.as_deref() {
+            Some("0") | None => {
+                let current_length = self.active_position.col + 1;
+                self.get_active_line_mut().cells.truncate(current_length);
+            }
+            Some("1") => {
+                for cell in self.get_active_line_mut().cells.iter_mut() {
+                    cell.grapheme = None
+                }
+            }
+            Some("2") => {
+                self.get_active_line_mut().cells.clear();
+            }
+            _ => {
+                error!("Unexpected EL argument {n:?}")
+            }
+        }
+    }
+
     // XXX replace with real formatting
     pub fn render(&self, max_lines: usize) -> String {
         let mut result = String::new();
@@ -133,6 +154,11 @@ impl DataComponent {
             Node::C0Control('\x0D') => self.activate_first_cell(),
             Node::C1Control('\x45') => self.activate_first_cell(),
             Node::C1Control('\x4D') => self.activate_prev_line(),
+            Node::ControlSequence {
+                parameter_bytes: n,
+                intermediate_bytes: _,
+                final_byte: 'K',
+            } => self.erase_in_line(n),
             node => info!("Ignoring node {node:?}"),
         };
     }
