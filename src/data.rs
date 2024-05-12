@@ -128,16 +128,20 @@ impl DataComponent {
     pub fn render(&self, max_lines: usize) -> String {
         let mut result = String::new();
         result.clear();
-        for line in self
+        for (row_index, line) in self
             .lines
             .iter()
             .skip(self.lines.len().saturating_sub(max_lines))
+            .enumerate()
         {
-            for cell in line.cells.iter() {
+            for (col_index, cell) in line.cells.iter().enumerate() {
                 if let Some(grapheme) = cell.grapheme.as_ref() {
                     result += grapheme;
                 } else {
                     result += " ";
+                }
+                if row_index == self.active_position.row && col_index == self.active_position.col {
+                    result += "\u{5f}";
                 }
             }
             result = result.trim_end().to_string() + "\n";
