@@ -105,8 +105,8 @@ impl DataComponent {
         self.active_position.col = 0;
     }
 
-    pub fn erase_in_line(&mut self, n: &Option<String>) {
-        match n.as_deref() {
+    pub fn erase_in_line(&mut self, n: Option<&str>) {
+        match n {
             Some("0") | None => {
                 let current_length = self.active_position.col + 1;
                 self.get_active_line_mut().cells.truncate(current_length);
@@ -179,7 +179,7 @@ impl DataComponent {
                 parameter_bytes: n,
                 intermediate_bytes: _,
                 final_byte: 'K',
-            } => self.erase_in_line(n),
+            } => self.erase_in_line(n.as_deref()),
             Node::ControlSequence {
                 parameter_bytes: Some(n),
                 intermediate_bytes: None,
