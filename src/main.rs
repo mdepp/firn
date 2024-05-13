@@ -88,6 +88,24 @@ impl Application for Firn {
                     .unwrap();
                 Command::none()
             }
+            Message::ApplicationEvent(Event::Keyboard(keyboard::Event::KeyPressed {
+                key_code,
+                modifiers: _,
+            })) => {
+                let text = match key_code {
+                    keyboard::KeyCode::Up => Some("\u{1b}[A".to_string()),
+                    keyboard::KeyCode::Down => Some("\u{1b}[B".to_string()),
+                    keyboard::KeyCode::Right => Some("\u{1b}[C".to_string()),
+                    keyboard::KeyCode::Left => Some("\u{1b}[D".to_string()),
+                    _ => None,
+                };
+                if let Some(text) = text {
+                    debug!("Send character to shell: {text}");
+                    self.send_to_child(child::InputEvent::Stdin(text.into_bytes()))
+                        .unwrap();
+                }
+                Command::none()
+            }
             Message::ApplicationEvent(Event::Window(window::Event::Resized { width, height })) => {
                 // XXX 10x20 is approximate at best
                 self.send_to_child(child::InputEvent::Resize(

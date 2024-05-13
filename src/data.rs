@@ -1,3 +1,4 @@
+use log::debug;
 use log::error;
 use log::info;
 use unicode_segmentation::UnicodeSegmentation;
@@ -124,6 +125,16 @@ impl DataComponent {
         }
     }
 
+    pub fn delete_character(&mut self, n: &str) {
+        let n: Result<usize, _> = n.parse();
+        if let Ok(n) = n {
+            let i = self.get_active_position().col + 1;
+            self.get_active_line_mut().cells.splice(i..(i + n), vec![]);
+        } else {
+            error!("Unable to parse {n:?}");
+        }
+    }
+
     // XXX replace with real formatting
     pub fn render(&self, max_lines: usize) -> String {
         let mut result = String::new();
@@ -151,6 +162,7 @@ impl DataComponent {
     }
 
     pub fn write_node(&mut self, node: &Node) {
+        debug!("{node:?}");
         match node {
             Node::Text(text) => self.write_text(text),
             Node::C0Control('\x08') => self.activate_prev_cell(),
@@ -159,10 +171,20 @@ impl DataComponent {
             Node::C1Control('\x45') => self.activate_first_cell(),
             Node::C1Control('\x4D') => self.activate_prev_line(),
             Node::ControlSequence {
+                parameter_bytes: None,
+                intermediate_bytes: None,
+                final_byte: 'C',
+            } => self.activate_next_cell(),
+            Node::ControlSequence {
                 parameter_bytes: n,
                 intermediate_bytes: _,
                 final_byte: 'K',
             } => self.erase_in_line(n),
+            Node::ControlSequence {
+                parameter_bytes: Some(n),
+                intermediate_bytes: None,
+                final_byte: 'P',
+            } => self.delete_character(n),
             node => info!("Ignoring node {node:?}"),
         };
     }
