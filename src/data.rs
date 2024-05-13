@@ -18,6 +18,7 @@ struct Line {
     cells: Vec<Cell>,
 }
 
+#[derive(Clone)]
 pub struct Cell {
     pub grapheme: Option<String>,
 }
@@ -135,6 +136,16 @@ impl DataComponent {
         }
     }
 
+    pub fn insert_character(&mut self, n: &str) {
+        let n: Result<usize, _> = n.parse();
+        if let Ok(n) = n {
+            let i = self.get_active_position().col;
+            self.get_active_line_mut()
+                .cells
+                .splice(i..i, vec![Cell { grapheme: None }; n]);
+        }
+    }
+
     // XXX replace with real formatting
     pub fn render(&self, max_lines: usize) -> String {
         let mut result = String::new();
@@ -170,6 +181,11 @@ impl DataComponent {
             Node::C0Control('\x0D') => self.activate_first_cell(),
             Node::C1Control('\x45') => self.activate_first_cell(),
             Node::C1Control('\x4D') => self.activate_prev_line(),
+            Node::ControlSequence {
+                parameter_bytes: Some(n),
+                intermediate_bytes: None,
+                final_byte: '@',
+            } => self.insert_character(n),
             Node::ControlSequence {
                 parameter_bytes: None,
                 intermediate_bytes: None,
